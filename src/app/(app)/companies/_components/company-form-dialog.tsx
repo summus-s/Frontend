@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
-import { useForm } from "react-hook-form"
+import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
@@ -13,10 +13,20 @@ import {
   type Company,
 } from "@/lib/api/companies"
 import { getErrorMessage } from "@/lib/api/types"
+import { DOCUMENT_TYPES, DOCUMENT_TYPE_LABELS } from "@/lib/document-types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { FormField } from "@/components/form-field"
+import { CountryCityFields } from "@/components/country-city-fields"
+import { AddressFields } from "@/components/address-fields"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Dialog,
   DialogContent,
@@ -29,6 +39,7 @@ import {
 const companySchema = z.object({
   name: z.string().min(1, "El nombre es obligatorio").max(120),
   legalName: z.string().max(160).optional().or(z.literal("")),
+  documentType: z.enum(DOCUMENT_TYPES).optional().or(z.literal("")),
   taxId: z.string().max(60).optional().or(z.literal("")),
   email: z.string().email("Correo inválido").optional().or(z.literal("")),
   phone: z.string().max(40).optional().or(z.literal("")),
@@ -54,6 +65,7 @@ export function CompanyFormDialog({
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
@@ -67,6 +79,7 @@ export function CompanyFormDialog({
       reset({
         name: company?.name ?? "",
         legalName: company?.legalName ?? "",
+        documentType: company?.documentType ?? "",
         taxId: company?.taxId ?? "",
         email: company?.email ?? "",
         phone: company?.phone ?? "",
@@ -83,6 +96,7 @@ export function CompanyFormDialog({
       const dto = {
         name: values.name,
         legalName: values.legalName || undefined,
+        documentType: values.documentType || undefined,
         taxId: values.taxId || undefined,
         email: values.email || undefined,
         phone: values.phone || undefined,
@@ -126,7 +140,28 @@ export function CompanyFormDialog({
             <Input id="legalName" {...register("legalName")} />
           </FormField>
 
-          <FormField label="NIT / Tax ID" htmlFor="taxId" error={errors.taxId?.message}>
+          <FormField label="Tipo de documento" htmlFor="documentType">
+            <Controller
+              control={control}
+              name="documentType"
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger id="documentType">
+                    <SelectValue placeholder="Selecciona un tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DOCUMENT_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {DOCUMENT_TYPE_LABELS[type]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          </FormField>
+
+          <FormField label="Número de documento" htmlFor="taxId" error={errors.taxId?.message}>
             <Input id="taxId" {...register("taxId")} />
           </FormField>
 
@@ -138,17 +173,32 @@ export function CompanyFormDialog({
             <Input id="phone" {...register("phone")} />
           </FormField>
 
-          <FormField label="País" htmlFor="country" error={errors.country?.message}>
-            <Input id="country" {...register("country")} />
-          </FormField>
+          <Controller
+            control={control}
+            name="country"
+            render={({ field: countryField }) => (
+              <Controller
+                control={control}
+                name="city"
+                render={({ field: cityField }) => (
+                  <CountryCityFields
+                    country={countryField.value ?? ""}
+                    city={cityField.value ?? ""}
+                    onCountryChange={countryField.onChange}
+                    onCityChange={cityField.onChange}
+                  />
+                )}
+              />
+            )}
+          />
 
-          <FormField label="Ciudad" htmlFor="city" error={errors.city?.message}>
-            <Input id="city" {...register("city")} />
-          </FormField>
-
-          <FormField label="Dirección" htmlFor="address" error={errors.address?.message} className="sm:col-span-2">
-            <Input id="address" {...register("address")} />
-          </FormField>
+          <Controller
+            control={control}
+            name="address"
+            render={({ field }) => (
+              <AddressFields value={field.value ?? ""} onChange={field.onChange} />
+            )}
+          />
 
           <FormField label="Notas" htmlFor="notes" error={errors.notes?.message} className="sm:col-span-2">
             <Textarea id="notes" rows={3} {...register("notes")} />

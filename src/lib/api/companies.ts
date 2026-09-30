@@ -1,5 +1,6 @@
 import { apiClient } from "@/lib/api/http";
 import type { Paginated, PaginationQuery } from "@/lib/api/types";
+import type { DocumentType } from "@/lib/document-types";
 
 export type CompanyStatus = "ACTIVE" | "SUSPENDED" | "DELETED";
 
@@ -7,6 +8,7 @@ export interface Company {
   id: string;
   name: string;
   legalName: string | null;
+  documentType: DocumentType | null;
   taxId: string | null;
   status: CompanyStatus;
   suspendedReason: string | null;
@@ -23,6 +25,7 @@ export interface Company {
 export interface CreateCompanyDto {
   name: string;
   legalName?: string;
+  documentType?: DocumentType;
   taxId?: string;
   email?: string;
   phone?: string;

@@ -1,11 +1,16 @@
 import { apiClient } from "@/lib/api/http";
+import type { DocumentType } from "@/lib/document-types";
 
 export interface CreateRegistrationDto {
   verticalId: string;
   planId: string;
   companyName: string;
   legalName?: string;
+  documentType?: DocumentType;
   taxId?: string;
+  country?: string;
+  city?: string;
+  address?: string;
   contactFullName: string;
   contactEmail: string;
   contactPhone?: string;

@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { useForm } from "react-hook-form"
+import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useQuery } from "@tanstack/react-query"
@@ -14,15 +14,31 @@ import { listPublicPlans } from "@/lib/api/public-plans"
 import { createRegistration } from "@/lib/api/public-registrations"
 import { getErrorMessage } from "@/lib/api/types"
 import { CURRENCY_SYMBOLS } from "@/components/currency-input"
+import { DOCUMENT_TYPES, DOCUMENT_TYPE_LABELS } from "@/lib/document-types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { FormField } from "@/components/form-field"
 import { Spinner } from "@/components/ui/spinner"
+import { CountryCityFields } from "@/components/country-city-fields"
+import { AddressFields } from "@/components/address-fields"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+
+const DARK_INPUT_CLASS = "bg-white/5 text-white placeholder:text-slate-500"
 
 const registrationSchema = z.object({
   companyName: z.string().min(1, "Ingresa el nombre de la empresa").max(120),
   legalName: z.string().max(150).optional().or(z.literal("")),
+  documentType: z.enum(DOCUMENT_TYPES).optional().or(z.literal("")),
   taxId: z.string().max(50).optional().or(z.literal("")),
+  country: z.string().max(80).optional().or(z.literal("")),
+  city: z.string().max(80).optional().or(z.literal("")),
+  address: z.string().max(200).optional().or(z.literal("")),
   contactFullName: z.string().min(1, "Ingresa tu nombre completo").max(120),
   contactEmail: z.string().email("Ingresa un correo válido"),
   contactPhone: z.string().max(40).optional().or(z.literal("")),
@@ -63,6 +79,7 @@ function RegistrationForm() {
 
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<RegistrationValues>({ resolver: zodResolver(registrationSchema) })
@@ -75,7 +92,11 @@ function RegistrationForm() {
         planId,
         companyName: values.companyName,
         legalName: values.legalName || undefined,
+        documentType: values.documentType || undefined,
         taxId: values.taxId || undefined,
+        country: values.country || undefined,
+        city: values.city || undefined,
+        address: values.address || undefined,
         contactFullName: values.contactFullName,
         contactEmail: values.contactEmail,
         contactPhone: values.contactPhone || undefined,
@@ -136,13 +157,72 @@ function RegistrationForm() {
           />
         </FormField>
 
-        <FormField label="NIT / Tax ID (opcional)" htmlFor="taxId" error={errors.taxId?.message}>
-          <Input
-            id="taxId"
-            className="bg-white/5 text-white placeholder:text-slate-500"
-            {...register("taxId")}
-          />
-        </FormField>
+        <div className="grid grid-cols-2 gap-3">
+          <FormField label="Tipo de documento" htmlFor="documentType">
+            <Controller
+              control={control}
+              name="documentType"
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger id="documentType" className={DARK_INPUT_CLASS}>
+                    <SelectValue placeholder="Selecciona" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DOCUMENT_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {DOCUMENT_TYPE_LABELS[type]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          </FormField>
+
+          <FormField label="Número de documento" htmlFor="taxId" error={errors.taxId?.message}>
+            <Input
+              id="taxId"
+              className={DARK_INPUT_CLASS}
+              {...register("taxId")}
+            />
+          </FormField>
+        </div>
+
+        <Controller
+          control={control}
+          name="country"
+          render={({ field: countryField }) => (
+            <Controller
+              control={control}
+              name="city"
+              render={({ field: cityField }) => (
+                <div className="grid grid-cols-2 gap-3">
+                  <CountryCityFields
+                    country={countryField.value ?? ""}
+                    city={cityField.value ?? ""}
+                    onCountryChange={countryField.onChange}
+                    onCityChange={cityField.onChange}
+                    inputClassName={DARK_INPUT_CLASS}
+                    triggerClassName={DARK_INPUT_CLASS}
+                  />
+                </div>
+              )}
+            />
+          )}
+        />
+
+        <Controller
+          control={control}
+          name="address"
+          render={({ field }) => (
+            <AddressFields
+              value={field.value ?? ""}
+              onChange={field.onChange}
+              inputClassName={DARK_INPUT_CLASS}
+              triggerClassName={DARK_INPUT_CLASS}
+            />
+          )}
+        />
 
         <div className="my-2 border-t border-white/10" />
 
