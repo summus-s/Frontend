@@ -3,15 +3,26 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { Plus } from "lucide-react"
+import { Pencil, Play, Plus, Power, Trash2 } from "lucide-react"
 
 import { activatePlan, deactivatePlan, deletePlan, listPlans, type Plan } from "@/lib/api/billing-plans"
 import { getErrorMessage } from "@/lib/api/types"
+import { CURRENCY_SYMBOLS } from "@/components/currency-input"
 import { PageHeader } from "@/components/page-header"
 import { PaginationControls } from "@/components/pagination-controls"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+
+function formatPrice(price: string, currency: string) {
+  const symbol = CURRENCY_SYMBOLS[currency] ?? currency
+  const amount = Number(price)
+  const formatted = new Intl.NumberFormat("es-CO", {
+    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(amount)
+  return `${symbol} ${formatted}`
+}
 import {
   Table,
   TableBody,
@@ -104,40 +115,46 @@ export default function BillingPlansPage() {
                 <TableCell className="font-medium">{plan.name}</TableCell>
                 <TableCell className="font-mono text-xs">{plan.code}</TableCell>
                 <TableCell>{CYCLE_LABELS[plan.billingCycle]}</TableCell>
-                <TableCell>
-                  {plan.price} {plan.currency}
-                </TableCell>
+                <TableCell>{formatPrice(plan.price, plan.currency)}</TableCell>
                 <TableCell>
                   <Badge variant={plan.isActive ? "success" : "outline"}>
                     {plan.isActive ? "Activo" : "Inactivo"}
                   </Badge>
                 </TableCell>
-                <TableCell className="flex justify-end gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setEditing(plan)
-                      setDialogOpen(true)
-                    }}
-                  >
-                    Editar
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => toggleMutation.mutate(plan)}>
-                    {plan.isActive ? "Desactivar" : "Activar"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-destructive"
-                    onClick={() => {
-                      if (window.confirm(`¿Eliminar el plan "${plan.name}"?`)) {
-                        deleteMutation.mutate(plan.id)
-                      }
-                    }}
-                  >
-                    Eliminar
-                  </Button>
+                <TableCell>
+                  <div className="flex justify-end gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      title="Editar"
+                      onClick={() => {
+                        setEditing(plan)
+                        setDialogOpen(true)
+                      }}
+                    >
+                      <Pencil className="size-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      title={plan.isActive ? "Desactivar" : "Activar"}
+                      onClick={() => toggleMutation.mutate(plan)}
+                    >
+                      {plan.isActive ? <Power className="size-4" /> : <Play className="size-4" />}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      title="Eliminar"
+                      onClick={() => {
+                        if (window.confirm(`¿Eliminar el plan "${plan.name}"?`)) {
+                          deleteMutation.mutate(plan.id)
+                        }
+                      }}
+                    >
+                      <Trash2 className="size-4 text-destructive" />
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}

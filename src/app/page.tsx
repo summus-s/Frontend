@@ -1,28 +1,103 @@
-import Link from "next/link";
+"use client"
 
-const plans = [
-  {
-    name: "Plan Básico",
-    price: "€29",
-    description: "Ideal para empresas pequeñas que quieren iniciar con una vertical.",
-    features: ["1 vertical activa", "Soporte básico", "Gestión de empresa", "Acceso inicial"],
-  },
-  {
-    name: "Plan Profesional",
-    price: "€59",
-    description: "Para empresas que necesitan más control, soporte y escalabilidad.",
-    features: ["Varias verticales", "Soporte prioritario", "Facturación", "Provisioning automático"],
-    highlighted: true,
-  },
-  {
-    name: "Plan Enterprise",
-    price: "A medida",
-    description: "Solución avanzada para compañías con necesidades específicas.",
-    features: ["Múltiples empresas", "Integraciones", "Auditoría", "Acompañamiento personalizado"],
-  },
-];
+import { useState } from "react"
+import Link from "next/link"
+import { useQuery } from "@tanstack/react-query"
+import { ChevronDown } from "lucide-react"
+
+import { listPublicVerticals } from "@/lib/api/public-verticals"
+import { listPublicPlans } from "@/lib/api/public-plans"
+import { CURRENCY_SYMBOLS } from "@/components/currency-input"
+import { Skeleton } from "@/components/ui/skeleton"
+
+const CYCLE_LABELS: Record<string, string> = {
+  MONTHLY: "/ mes",
+  QUARTERLY: "/ trimestre",
+  SEMIANNUAL: "/ semestre",
+  ANNUAL: "/ año",
+}
+
+function formatPrice(price: string, currency: string) {
+  const symbol = CURRENCY_SYMBOLS[currency] ?? currency
+  const amount = Number(price)
+  const formatted = new Intl.NumberFormat("es-CO", {
+    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(amount)
+  return `${symbol} ${formatted}`
+}
+
+function VerticalPlans({ verticalId }: { verticalId: string }) {
+  const plansQuery = useQuery({
+    queryKey: ["public-plans", verticalId],
+    queryFn: () => listPublicPlans(verticalId),
+  })
+
+  if (plansQuery.isLoading) {
+    return (
+      <div className="mt-6 grid gap-3 sm:grid-cols-2">
+        <Skeleton className="h-24 bg-white/10" />
+        <Skeleton className="h-24 bg-white/10" />
+      </div>
+    )
+  }
+
+  if (!plansQuery.data || plansQuery.data.length === 0) {
+    return (
+      <p className="mt-6 text-sm text-slate-400">
+        Todavía no hay planes publicados para esta solución.
+      </p>
+    )
+  }
+
+  return (
+    <div className="mt-6 grid gap-3 sm:grid-cols-2">
+      {plansQuery.data.map((plan) => (
+        <div
+          key={plan.id}
+          className={`flex flex-col justify-between rounded-2xl border p-5 ${
+            plan.isFeatured
+              ? "border-blue-400/50 bg-blue-500/10"
+              : "border-white/10 bg-white/5"
+          }`}
+        >
+          <div>
+            {plan.isFeatured && (
+              <span className="mb-2 inline-block rounded-full bg-blue-500 px-2.5 py-0.5 text-xs font-semibold">
+                Recomendado
+              </span>
+            )}
+            <h4 className="font-semibold">{plan.name}</h4>
+            {plan.description && (
+              <p className="mt-1 text-sm text-slate-400">{plan.description}</p>
+            )}
+            <p className="mt-3 text-2xl font-bold">
+              {formatPrice(plan.price, plan.currency)}
+              <span className="ml-1 text-sm font-normal text-slate-400">
+                {CYCLE_LABELS[plan.billingCycle] ?? ""}
+              </span>
+            </p>
+          </div>
+          <Link
+            href={`/registro?verticalId=${verticalId}&planId=${plan.id}`}
+            className="mt-4 block rounded-xl bg-white px-4 py-2 text-center text-sm font-semibold text-slate-950 hover:bg-slate-200"
+          >
+            Solicitar acceso
+          </Link>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 export default function HomePage() {
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  const verticalsQuery = useQuery({
+    queryKey: ["public-verticals"],
+    queryFn: listPublicVerticals,
+  })
+
   return (
     <main className="min-h-screen bg-slate-950 text-white">
       <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/90 backdrop-blur">
@@ -39,7 +114,6 @@ export default function HomePage() {
 
           <nav className="hidden items-center gap-8 text-sm text-slate-300 md:flex">
             <a href="#solutions" className="hover:text-white">Soluciones</a>
-            <a href="#plans" className="hover:text-white">Planes</a>
             <a href="#why" className="hover:text-white">Por qué Summuss</a>
             <a href="#contact" className="hover:text-white">Contacto</a>
           </nav>
@@ -53,10 +127,10 @@ export default function HomePage() {
             </Link>
 
             <a
-              href="#plans"
+              href="#solutions"
               className="rounded-xl bg-blue-500 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-600"
             >
-              Ver planes
+              Ver soluciones
             </a>
           </div>
         </div>
@@ -84,10 +158,10 @@ export default function HomePage() {
           </Link>
 
           <a
-            href="#plans"
+            href="#solutions"
             className="rounded-xl border border-white/20 px-6 py-3 font-semibold text-white hover:bg-white/10"
           >
-            Ver planes
+            Ver soluciones
           </a>
         </div>
       </section>
@@ -117,58 +191,61 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section id="plans" className="mx-auto max-w-7xl px-6 py-24">
+      <section id="solutions" className="mx-auto max-w-7xl px-6 py-24">
         <div className="text-center">
-          <h2 className="text-3xl font-bold md:text-5xl">Planes para cada etapa</h2>
+          <h2 className="text-3xl font-bold md:text-5xl">Nuestras soluciones</h2>
           <p className="mt-4 text-slate-300">
-            Elige el plan adecuado según el tamaño y operación de tu empresa.
+            Cada solución es una vertical lista para tu negocio, con sus propios planes.
           </p>
         </div>
 
-        <div className="mt-14 grid gap-6 md:grid-cols-3">
-          {plans.map((plan) => (
-            <article
-              key={plan.name}
-              className={`rounded-3xl border p-8 ${
-                plan.highlighted
-                  ? "border-blue-400 bg-blue-500/10 shadow-2xl shadow-blue-500/20"
-                  : "border-white/10 bg-white/5"
-              }`}
-            >
-              {plan.highlighted && (
-                <span className="mb-5 inline-block rounded-full bg-blue-500 px-3 py-1 text-sm font-semibold">
-                  Recomendado
-                </span>
-              )}
+        {verticalsQuery.isLoading && (
+          <div className="mt-14 grid gap-6 md:grid-cols-2">
+            <Skeleton className="h-32 bg-white/5" />
+            <Skeleton className="h-32 bg-white/5" />
+          </div>
+        )}
 
-              <h3 className="text-2xl font-bold">{plan.name}</h3>
-              <p className="mt-4 text-slate-300">{plan.description}</p>
+        {!verticalsQuery.isLoading && (verticalsQuery.data?.length ?? 0) === 0 && (
+          <p className="mt-14 text-center text-slate-400">
+            Muy pronto vas a encontrar aquí nuestras primeras soluciones.
+          </p>
+        )}
 
-              <div className="mt-8">
-                <span className="text-4xl font-bold">{plan.price}</span>
-                {plan.price !== "A medida" && (
-                  <span className="text-slate-400"> / mes</span>
+        <div className="mt-14 flex flex-col gap-4">
+          {verticalsQuery.data?.map((vertical) => {
+            const isOpen = expandedId === vertical.id
+            return (
+              <div
+                key={vertical.id}
+                className="overflow-hidden rounded-3xl border border-white/10 bg-white/5"
+              >
+                <button
+                  type="button"
+                  onClick={() => setExpandedId(isOpen ? null : vertical.id)}
+                  className="flex w-full items-center justify-between gap-4 p-8 text-left"
+                >
+                  <div>
+                    <h3 className="text-2xl font-bold">{vertical.name}</h3>
+                    <p className="mt-2 text-slate-300">
+                      {vertical.description ?? "Solución lista para tu negocio."}
+                    </p>
+                  </div>
+                  <ChevronDown
+                    className={`size-6 shrink-0 text-slate-400 transition-transform ${
+                      isOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+
+                {isOpen && (
+                  <div className="border-t border-white/10 px-8 pb-8">
+                    <VerticalPlans verticalId={vertical.id} />
+                  </div>
                 )}
               </div>
-
-              <ul className="mt-8 space-y-3 text-slate-300">
-                {plan.features.map((feature) => (
-                  <li key={feature}>✓ {feature}</li>
-                ))}
-              </ul>
-
-              <Link
-                href="/login"
-                className={`mt-8 block rounded-xl px-5 py-3 text-center font-semibold ${
-                  plan.highlighted
-                    ? "bg-blue-500 text-white hover:bg-blue-600"
-                    : "bg-white text-slate-950 hover:bg-slate-200"
-                }`}
-              >
-                Solicitar acceso
-              </Link>
-            </article>
-          ))}
+            )
+          })}
         </div>
       </section>
 
@@ -187,5 +264,5 @@ export default function HomePage() {
         </Link>
       </section>
     </main>
-  );
+  )
 }

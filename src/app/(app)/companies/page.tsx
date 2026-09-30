@@ -1,15 +1,16 @@
 "use client"
 
 import { useState } from "react"
-import Link from "next/link"
-import { useQuery } from "@tanstack/react-query"
-import { Plus, Search } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
+import { Pencil, Plus, Search, Trash2 } from "lucide-react"
 
-import { listCompanies, type CompanyStatus } from "@/lib/api/companies"
+import { deleteCompany, listCompanies, type Company, type CompanyStatus } from "@/lib/api/companies"
+import { getErrorMessage } from "@/lib/api/types"
 import { useDebouncedValue } from "@/lib/use-debounced-value"
 import { PageHeader } from "@/components/page-header"
 import { PaginationControls } from "@/components/pagination-controls"
-import { StatusBadge } from "@/components/status-badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -29,6 +30,7 @@ import {
 } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
 import { CompanyFormDialog } from "./_components/company-form-dialog"
+import { CompanyStatusCell } from "./_components/company-status-cell"
 
 const STATUS_OPTIONS: { value: CompanyStatus | "ALL"; label: string }[] = [
   { value: "ALL", label: "Todos los estados" },
@@ -38,12 +40,15 @@ const STATUS_OPTIONS: { value: CompanyStatus | "ALL"; label: string }[] = [
 ]
 
 export default function CompaniesPage() {
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<CompanyStatus | "ALL">("ALL");
-  const [createOpen, setCreateOpen] = useState(false);
-  const debouncedSearch = useDebouncedValue(search);
-  const limit = 10;
+  const router = useRouter()
+  const [page, setPage] = useState(1)
+  const [search, setSearch] = useState("")
+  const [status, setStatus] = useState<CompanyStatus | "ALL">("ALL")
+  const [createOpen, setCreateOpen] = useState(false)
+  const [editing, setEditing] = useState<Company | undefined>(undefined)
+  const debouncedSearch = useDebouncedValue(search)
+  const queryClient = useQueryClient()
+  const limit = 10
 
   const query = useQuery({
     queryKey: ["companies", { page, limit, search: debouncedSearch, status }],
@@ -56,13 +61,27 @@ export default function CompaniesPage() {
       }),
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteCompany(id),
+    onSuccess: () => {
+      toast.success("Empresa eliminada")
+      queryClient.invalidateQueries({ queryKey: ["companies"] })
+    },
+    onError: (error) => toast.error(getErrorMessage(error)),
+  })
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Empresas"
         description="Empresas cliente registradas en la plataforma."
         actions={
-          <Button onClick={() => setCreateOpen(true)}>
+          <Button
+            onClick={() => {
+              setEditing(undefined)
+              setCreateOpen(true)
+            }}
+          >
             <Plus className="size-4" />
             Nueva empresa
           </Button>
@@ -112,13 +131,14 @@ export default function CompaniesPage() {
               <TableHead>Contacto</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Creada</TableHead>
+              <TableHead className="w-24" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {query.isLoading &&
               Array.from({ length: 5 }).map((_, index) => (
                 <TableRow key={index}>
-                  <TableCell colSpan={5}>
+                  <TableCell colSpan={6}>
                     <Skeleton className="h-5 w-full" />
                   </TableCell>
                 </TableRow>
@@ -126,25 +146,54 @@ export default function CompaniesPage() {
 
             {!query.isLoading && query.data?.items.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                   No se encontraron empresas.
                 </TableCell>
               </TableRow>
             )}
 
             {query.data?.items.map((company) => (
-              <TableRow key={company.id} className="cursor-pointer">
-                <TableCell className="font-medium">
-                  <Link href={`/companies/${company.id}`} className="hover:underline">
-                    {company.name}
-                  </Link>
-                </TableCell>
+              <TableRow
+                key={company.id}
+                className="cursor-pointer"
+                onClick={() => router.push(`/companies/${company.id}`)}
+              >
+                <TableCell className="font-medium">{company.name}</TableCell>
                 <TableCell>{company.taxId ?? "—"}</TableCell>
                 <TableCell>{company.email ?? "—"}</TableCell>
                 <TableCell>
-                  <StatusBadge status={company.status} />
+                  <CompanyStatusCell company={company} />
                 </TableCell>
                 <TableCell>{new Date(company.createdAt).toLocaleDateString("es-CO")}</TableCell>
+                <TableCell>
+                  <div className="flex justify-end gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      title="Editar"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        setEditing(company)
+                        setCreateOpen(true)
+                      }}
+                    >
+                      <Pencil className="size-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      title="Eliminar"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        if (window.confirm(`¿Eliminar la empresa "${company.name}"?`)) {
+                          deleteMutation.mutate(company.id)
+                        }
+                      }}
+                    >
+                      <Trash2 className="size-4 text-destructive" />
+                    </Button>
+                  </div>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -160,7 +209,7 @@ export default function CompaniesPage() {
         </div>
       </div>
 
-      <CompanyFormDialog open={createOpen} onOpenChange={setCreateOpen} />
+      <CompanyFormDialog open={createOpen} onOpenChange={setCreateOpen} company={editing} />
     </div>
   )
 }

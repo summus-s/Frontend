@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
-import { useForm, Controller } from "react-hook-form"
+import { useForm, useWatch, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
@@ -12,6 +12,7 @@ import { listVerticals } from "@/lib/api/verticals"
 import { getErrorMessage } from "@/lib/api/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { CurrencyInput } from "@/components/currency-input"
 import { FormField } from "@/components/form-field"
 import {
   Select,
@@ -67,6 +68,8 @@ export function PlanFormDialog({
     resolver: zodResolver(planSchema),
     defaultValues: { billingCycle: "MONTHLY", currency: "COP" },
   })
+
+  const currency = useWatch({ control, name: "currency" })
 
   useEffect(() => {
     if (open) {
@@ -152,7 +155,19 @@ export function PlanFormDialog({
           </FormField>
 
           <FormField label="Precio" htmlFor="price" error={errors.price?.message}>
-            <Input id="price" placeholder="29.90" {...register("price")} />
+            <Controller
+              control={control}
+              name="price"
+              render={({ field }) => (
+                <CurrencyInput
+                  id="price"
+                  value={field.value}
+                  onChange={field.onChange}
+                  currency={currency}
+                  placeholder="0"
+                />
+              )}
+            />
           </FormField>
 
           <FormField label="Moneda" htmlFor="currency">
